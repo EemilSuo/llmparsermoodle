@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM to Moodle Parser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .latex-preview { font-family: 'Times New Roman', serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 p-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="bg-blue-600 text-white p-2 rounded-lg">
+                <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+            </div>
+            <h1 class="text-xl font-bold text-slate-800">LLM to Moodle Parser</h1>
+        </div>
+        <div class="text-sm text-slate-500">
+            Muuntaa matematiikkaa ja tekstiä Moodle-ystävälliseen muotoon.
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Panel: Input -->
+        <div class="w-1/2 flex flex-col border-r border-slate-200 bg-white">
+            <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+                    <i data-lucide="file-input" class="w-4 h-4"></i>
+                    Syöte (LLM vastaus)
+                </h2>
+                <button onclick="clearInput()" class="text-xs text-red-600 hover:text-red-700 font-medium">
+                    Tyhjennä
+                </button>
+            </div>
+            <textarea id="inputArea" class="flex-1 p-4 resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 font-mono text-sm" 
+                placeholder="Liitä LLM:n vastaus tähän (esim. 'A1.3.1 Tutkimusasetelma...')..."></textarea>
+            
+            <div class="p-4 border-t border-slate-200 bg-slate-50">
+                <button onclick="processContent()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm">
+                    <i data-lucide="wand-2" class="w-5 h-5"></i>
+                    Muunna Moodle-muotoon
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Output -->
+        <div class="w-1/2 flex flex-col bg-slate-50">
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-200 bg-white shrink-0">
+                <button onclick="switchTab('cleaned')" id="tab-cleaned" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-blue-600 text-blue-600 hover:bg-slate-50 transition-colors">
+                    Siistitty raakateksti
+                </button>
+                <button onclick="switchTab('parsed')" id="tab-parsed" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors">
+                    Jäsennetyt kysymykset
+                </button>
+            </div>
+
+            <!-- Content: Cleaned Raw Text -->
+            <div id="view-cleaned" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-700">Koko teksti (Vim-makrot ajettu)</h3>
+                        <button onclick="copyToClipboard('cleanedOutput')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded border border-slate-300 transition-colors flex items-center gap-1">
+                            <i data-lucide="copy" class="w-3 h-3"></i> Kopioi
+                        </button>
+                    </div>
+                    <textarea id="cleanedOutput" readonly class="w-full h-[600px] text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded p-3 font-mono focus:outline-none focus:border-blue-400"></textarea>
+                </div>
+            </div>
+
+            <!-- Content: Parsed Questions -->
+            <div id="view-parsed" class="hidden flex-1 overflow-y-auto p-4 space-y-6">
+                <!-- Intro Context Card -->
+                <div id="contextCard" class="bg-white rounded-lg shadow-sm border-l-4 border-blue-500 p-4 hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">Konteksti / Esitiedot</span>
+                        <button onclick="copyContent(this)" class="text-slate-400 hover:text-blue-600 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <div class="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap font-mono text-xs bg-slate-50 p-2 rounded border border-slate-100 question-content"></div>
+                </div>
+
+                <!-- Questions Container -->
+                <div id="questionsList" class="space-y-4"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 z-50">
+        <i data-lucide="check-circle" class="w-4 h-4 text-green-400"></i>
+        <span id="toastMsg">Kopioitu leikepöydälle!</span>
+    </div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // --------------------------------------------------------
+        // CORE LOGIC: The Replacer (Equivalent to Vim Macros)
+        // --------------------------------------------------------
+        function applyReplacements(text) {
+            let processed = text;
+
+            // 1. Remove Markdown Bold (*)
+            // Vim: %s/\*//g
+            processed = processed.replace(/\*/g, '');
+
+            // 2. Remove "Vaihe X:" lines
+            // Vim: g/^Vaihe [0-9]:/d
+            processed = processed.replace(/^Vaihe \d+:.*$/gm, '');
+
+            // 3. Remove Headers (###, ####)
+            // Vim: %s/####\s*//g
+            processed = processed.replace(/#{3,}\s*/g, '');
+
+            // 4. Remove Horizontal Rules (---)
+            // Vim: %s/---//g
+            processed = processed.replace(/---/g, '');
+
+            // 5. Fix Math: \times -> \cdot
+            // Vim: :%s/\\times/\\cdot/g
+            processed = processed.replace(/\\times/g, '\\cdot');
+
+            // 6. Fix Decimals: 1.5 -> 1,5 (Finnish Standard)
+            // Vim: %s/\(\d\)\.\(\d\)/\1,\2/g
+            // Note: This is aggressive and might affect version numbers like A1.3.1. 
+            // We apply it, but we might want to be careful with question IDs later.
+            processed = processed.replace(/(\d)\.(\d)/g, '$1,$2');
+
+            // 7. Fix Euro sign: € -> \text{€}
+            processed = processed.replace(/€/g, '\\text{€}');
+
+            // 8. Add Double $$ for Moodle
+            // Strategy: Convert single $ to $$ IF it's not already $$.
+            // This is tricky. A simple approach is: replace all $ with $$, then fix $$$$ to $$.
+            // Or use a regex that looks for single $ boundary.
+            // Let's assume standard $x$ format.
+            // We use a negative lookahead/lookbehind to find single $.
+            processed = processed.replace(/(?<!\$)\$(?!\$)/g, '$$$$'); // Replace single $ with $$
+
+            // 9. Clean up Display Math brackets (Remove extra whitespace/newlines inside)
+            // Vim: %s/\\\[\s*\n*\s*/\\\[/g
+            processed = processed.replace(/\\\[\s*\n*\s*/g, '\\[');
+            // Vim: %s/\s*\n*\s*\\\]/\\\]/g
+            processed = processed.replace(/\s*\n*\s*\\\]/g, '\\]');
+
+            // 10. List Numbering Cleanup (1. Text -> Text)
+            // Vim: %s/[1-9]\. //g  (This is aggressive, removes "1. ")
+            // This might break the question list logic if we aren't careful, but requested.
+            // We will modify this slightly: Remove numbering only if it starts a line or is clearly a list item
+            processed = processed.replace(/^\s*\d+\.\s+/gm, ''); 
+
+            // 11. Normalize Newlines
+            // Vim: %s/\n\{2,}/\r/g (Reduce multiple newlines)
+            processed = processed.replace(/\n{3,}/g, '\n\n'); // Max 2 newlines
+            processed = processed.trim();
+
+            return processed;
+        }
+
+        // --------------------------------------------------------
+        // SMART PARSER: Break into Questions
+        // --------------------------------------------------------
+        function parseQuestions(text) {
+            const lines = text.split('\n');
+            let context = [];
+            let questions = [];
+            let currentQuestion = null;
+            
+            // Heuristic patterns
+            const questionIdRegex = /^(A\d+[.,]\d+[.,]\d+|Tehtävä \d+|Kysymys \d+)/i;
+            const optionRegex = /^[A-D]\./;
+            const modelAnswerRegex = /(Mallivastaukset|Vastaukset|Selitykset)/i;
+
+            let parsingMode = 'context'; // context, questions, answers
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // Detect shift to Answers section
+                if (modelAnswerRegex.test(line)) {
+                    parsingMode = 'answers';
+                    continue;
+                }
+
+                // Detect new Question (e.g., A1.3.1)
+                const qMatch = line.match(questionIdRegex);
+                
+                if (parsingMode === 'context' && qMatch) {
+                    parsingMode = 'questions';
+                }
+
+                if (parsingMode === 'context') {
+                    context.push(line);
+                } else if (parsingMode === 'questions') {
+                    if (qMatch) {
+                        // Start new question
+                        if (currentQuestion) questions.push(currentQuestion);
+                        currentQuestion = {
+                            id: qMatch[0],
+                            text: line.replace(qMatch[0], '').trim(), // Remove ID from text for cleaner paste
+                            fullText: line,
+                            options: [],
+                            answer: '',
+                            explanation: ''
+                        };
+                    } else if (optionRegex.test(line)) {
+                        // Is an option
+                        if (currentQuestion) {
+                            currentQuestion.options.push(line);
+                        }
+                    } else {
+                        // Continuation of question text or unstructured text
+                        if (currentQuestion) {
+                            // If it doesn't look like a new question, append to text
+                            if (!optionRegex.test(line)) {
+                                currentQuestion.text += '\n' + line;
+                                currentQuestion.fullText += '\n' + line;
+                            }
+                        }
+                    }
+                } else if (parsingMode === 'answers') {
+                    // Try to match answers to questions
+                    // This is hard to do perfectly without strict structure, 
+                    // so we will just dump remaining text or try to find ID matches
+                    const ansMatch = line.match(questionIdRegex);
+                    if (ansMatch) {
+                        // Find the question this belongs to
+                        const qId = ansMatch[0]; // e.g., A1,3,1 (after comma replacement)
+                        // Need to be loose with matching because we replaced dots with commas in main text
+                        const targetQ = questions.find(q => q.id === qId || q.id.replace(/,/g, '.') === qId.replace(/,/g, '.'));
+                        
+                        if (targetQ) {
+                            targetQ.explanation += line + '\n';
+                            // Look ahead for next lines until next ID
+                            // (Simplified logic for this demo)
+                        }
+                    } else {
+                        // Append to last modified question or ignore
+                        // For this demo, let's just leave it basic.
+                    }
+                }
+            }
+            if (currentQuestion) questions.push(currentQuestion);
+
+            return { context: context.join('\n'), questions };
+        }
+
+        // --------------------------------------------------------
+        // UI FUNCTIONS
+        // --------------------------------------------------------
+
+        function processContent() {
+            const rawInput = document.getElementById('inputArea').value;
+            if (!rawInput) return;
+
+            // 1. Run Clean Logic
+            const cleanedText = applyReplacements(rawInput);
+            document.getElementById('cleanedOutput').value = cleanedText;
+
+            // 2. Run Smart Parse Logic
+            const parsedData = parseQuestions(cleanedText);
+            renderParsedView(parsedData);
+        }
+
+        function renderParsedView(data) {
+            const contextCard = document.getElementById('contextCard');
+            const questionsList = document.getElementById('questionsList');
+            questionsList.innerHTML = '';
+
+            // Render Context
+            if (data.context.length > 0) {
+                contextCard.classList.remove('hidden');
+                contextCard.querySelector('.question-content').textContent = data.context;
+            } else {
+                contextCard.classList.add('hidden');
+            }
+
+            // Render Questions
+            data.questions.forEach((q, index) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden';
+                
+                let optionsHtml = '';
+                q.options.forEach(opt => {
+                    optionsHtml += `<div class="text-slate-600 ml-4 py-1 border-l-2 border-slate-100 pl-2 text-sm font-mono">${escapeHtml(opt)}</div>`;
+                });
+
+                card.innerHTML = `
+                    <div class="bg-slate-100 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                        <span class="font-bold text-slate-700 text-sm">${q.id}</span>
+                        <div class="flex gap-2">
+                             <button onclick="copyText('${escapeJs(q.text)}')" class="text-xs bg-white hover:bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 transition-colors">
+                                Kopioi Kysymys
+                            </button>
+                             <button onclick="copyText('${escapeJs(q.fullText)}')" class="text-xs bg-white hover:bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-300 transition-colors">
+                                Kaikki
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-3 text-slate-800 font-mono text-sm whitespace-pre-wrap">${escapeHtml(q.text)}</div>
+                        ${optionsHtml ? `<div class="mt-2 space-y-1 bg-slate-50 p-2 rounded">${optionsHtml}</div>` : ''}
+                        ${q.explanation ? `<div class="mt-3 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100"><strong>Selitys:</strong><br>${escapeHtml(q.explanation)}</div>` : ''}
+                    </div>
+                `;
+                questionsList.appendChild(card);
+            });
+            
+            lucide.createIcons();
+        }
+
+        function switchTab(tabName) {
+            const btnCleaned = document.getElementById('tab-cleaned');
+            const btnParsed = document.getElementById('tab-parsed');
+            const viewCleaned = document.getElementById('view-cleaned');
+            const viewParsed = document.getElementById('view-parsed');
+
+            if (tabName === 'cleaned') {
+                btnCleaned.classList.add('border-blue-600', 'text-blue-600');
+                btnCleaned.classList.remove('border-transparent', 'text-slate-500');
+                btnParsed.classList.remove('border-blue-600', 'text-blue-600');
+                btnParsed.classList.add('border-transparent', 'text-slate-500');
+                
+                viewCleaned.classList.remove('hidden');
+                viewParsed.classList.add('hidden');
+            } else {
+                btnParsed.classList.add('border-blue-600', 'text-blue-600');
+                btnParsed.classList.remove('border-transparent', 'text-slate-500');
+                btnCleaned.classList.remove('border-blue-600', 'text-blue-600');
+                btnCleaned.classList.add('border-transparent', 'text-slate-500');
+
+                viewParsed.classList.remove('hidden');
+                viewCleaned.classList.add('hidden');
+            }
+        }
+
+        function clearInput() {
+            document.getElementById('inputArea').value = '';
+            document.getElementById('cleanedOutput').value = '';
+            document.getElementById('questionsList').innerHTML = '';
+            document.getElementById('contextCard').classList.add('hidden');
+        }
+
+        // --------------------------------------------------------
+        // UTILS
+        // --------------------------------------------------------
+        
+        function copyToClipboard(elementId) {
+            const el = document.getElementById(elementId);
+            el.select();
+            document.execCommand('copy');
+            showToast();
+        }
+
+        function copyContent(btn) {
+            const text = btn.closest('.rounded-lg').querySelector('.question-content').textContent;
+            navigator.clipboard.writeText(text).then(showToast);
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(showToast);
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeJs(text) {
+            if (!text) return '';
+            return text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        }
+
+    </script>
+</body>
+</html>
