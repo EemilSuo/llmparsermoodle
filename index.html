@@ -94,7 +94,7 @@
                 </div>
             </div>
         </div>
-    </main>
+    main>
 
     <!-- Notification Toast -->
     <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 z-50">
@@ -112,9 +112,9 @@
         function applyReplacements(text) {
             let processed = text;
 
-            // --- CRITICAL FIX: Merge split headers (e.g., "Tehtävä\n5" -> "Tehtävä 5") ---
-            // This fixes the parsing of Question 5 in your input
-            processed = processed.replace(/(Tehtävä|Kysymys)\s*\n+\s*(\d)/gi, '$1 $2');
+            // Merge split headers (e.g., "Tehtävä\n5" -> "Tehtävä 5")
+            // FIXED: Now supports "Tehtävä\nA2" properly
+            processed = processed.replace(/(Tehtävä|Kysymys)\s*\n+\s*([A-Z]?\d)/gi, '$1 $2');
 
             // Remove Markdown bold/italic (*)
             processed = processed.replace(/\*/g, '');
@@ -143,6 +143,15 @@
         // --------------------------------------------------------
         // 2. PARSING LOGIC
         // --------------------------------------------------------
+        
+        // Helper: Normalize ID for comparison (removes "Tehtävä", dots, spaces)
+        // e.g., "Tehtävä A2.1.1" -> "a211", "A2.1.1" -> "a211"
+        function normalizeId(id) {
+            return id.toLowerCase()
+                .replace(/^(tehtävä|kysymys)\s*/, '') // Remove prefix
+                .replace(/[^a-z0-9]/g, ''); // Remove non-alphanumeric (dots, commas, spaces)
+        }
+
         function parseQuestions(text) {
             const lines = text.split('\n');
             let context = [];
@@ -150,7 +159,9 @@
             let currentQuestion = null;
             let currentAnswerTarget = null;
             
-            const questionIdRegex = /^(Tehtävä\s*\d+(?:[.,]\d+)*|Kysymys\s*\d+(?:[.,]\d+)*|A\d+(?:[.,]\d+)*)([:.]?)/i;
+            // FIXED REGEX: Now supports IDs with letters, e.g. "Tehtävä A2.1.1" or "A2.1.1"
+            // Old was: /^(Tehtävä\s*\d+...
+            const questionIdRegex = /^(Tehtävä\s*[A-Z]?\d+(?:[.,]\d+)*|Kysymys\s*[A-Z]?\d+(?:[.,]\d+)*|[A-Z]\d+(?:[.,]\d+)*)([:.]?)/i;
             const optionRegex = /^([A-D])\./; 
             const correctMarkerRegex = /\s*&&&&$/; 
             const modelAnswerHeaderRegex = /^(Mallivastaukset|Vastaukset|Selitykset)/i;
@@ -163,7 +174,7 @@
 
                 // --- DETECT SECTION CHANGE ---
                 if (modelAnswerHeaderRegex.test(line)) {
-                    // FIX: If we have a pending question when switching to answers, SAVE IT.
+                    // Push potential pending question before switching
                     if (currentQuestion && parsingMode === 'questions') {
                         questions.push(currentQuestion);
                     }
@@ -177,6 +188,7 @@
                     const qMatch = line.match(questionIdRegex);
                     if (qMatch) {
                         parsingMode = 'questions';
+                        // Don't skip processing this line, fall through to questions
                     } else {
                         context.push(line);
                         continue;
@@ -234,10 +246,9 @@
                     if (ansMatch) {
                         const qIdRaw = ansMatch[1]; 
                         
+                        // Improved matching using normalizeId
                         currentAnswerTarget = questions.find(q => {
-                            const normalizedQ = q.id.replace(/[,.]/g, '').toLowerCase().replace(/\s+/g, '');
-                            const normalizedA = qIdRaw.replace(/[,.]/g, '').toLowerCase().replace(/\s+/g, '');
-                            return normalizedQ === normalizedA;
+                            return normalizeId(q.id) === normalizeId(qIdRaw);
                         });
 
                         if (currentAnswerTarget) {
@@ -256,8 +267,7 @@
                     }
                 }
             }
-            // Push the last question if loop finishes (e.g. no answers section at all)
-            // Note: If we switched to answers mode, currentQuestion was nulled, so this won't duplicate.
+            // Push last question if needed
             if (currentQuestion && parsingMode === 'questions') questions.push(currentQuestion);
 
             return { context: context.join('\n'), questions };
@@ -335,7 +345,6 @@
                 // --- EXPLANATION RENDER ---
                 let explanationHtml = '';
                 if (q.explanation && q.explanation.trim() !== '') {
-                    // CSS Change: whitespace-normal here too, and tight margin (mt-2 instead of 4)
                     explanationHtml = `
                         <div class="mt-2 pt-2 border-t border-slate-100">
                             <div class="flex justify-between items-start mb-1">
@@ -352,7 +361,6 @@
                 }
 
                 // --- CARD STRUCTURE ---
-                // CSS Change: whitespace-normal for q.text to fix "jagged" look
                 card.innerHTML = `
                     <div class="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center">
                         <span class="font-bold text-indigo-900 text-sm">${escapeHtml(q.id)}</span>
