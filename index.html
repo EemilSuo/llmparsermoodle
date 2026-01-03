@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM to Moodle Parser</title>
+    <title>Moodle Tehtäväparseri</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .latex-preview { font-family: 'Times New Roman', serif; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 h-screen flex flex-col overflow-hidden">
@@ -17,13 +16,13 @@
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 p-4 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
-            <div class="bg-blue-600 text-white p-2 rounded-lg">
-                <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+            <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                <i data-lucide="calculator" class="w-6 h-6"></i>
             </div>
-            <h1 class="text-xl font-bold text-slate-800">LLM to Moodle Parser</h1>
+            <h1 class="text-xl font-bold text-slate-800">Moodle Tehtäväparseri</h1>
         </div>
-        <div class="text-sm text-slate-500">
-            Muuntaa matematiikkaa ja tekstiä Moodle-ystävälliseen muotoon.
+        <div class="text-sm text-slate-500 hidden sm:block">
+            Tukee: &&&& oikeat vastaukset, Tehtävä X -otsikot, LaTeX ($$)
         </div>
     </header>
 
@@ -34,20 +33,20 @@
         <div class="w-1/2 flex flex-col border-r border-slate-200 bg-white">
             <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h2 class="font-semibold text-slate-700 flex items-center gap-2">
-                    <i data-lucide="file-input" class="w-4 h-4"></i>
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
                     Syöte (LLM vastaus)
                 </h2>
-                <button onclick="clearInput()" class="text-xs text-red-600 hover:text-red-700 font-medium">
+                <button onclick="clearInput()" class="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">
                     Tyhjennä
                 </button>
             </div>
-            <textarea id="inputArea" class="flex-1 p-4 resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 font-mono text-sm" 
-                placeholder="Liitä LLM:n vastaus tähän (esim. 'A1.3.1 Tutkimusasetelma...')..."></textarea>
+            <textarea id="inputArea" class="flex-1 p-4 resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 font-mono text-sm" 
+                placeholder="Liitä LLM:n tuottama teksti tähän (sisältäen Tehtävä 1, &&&& merkinnät jne.)..."></textarea>
             
             <div class="p-4 border-t border-slate-200 bg-slate-50">
-                <button onclick="processContent()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm">
-                    <i data-lucide="wand-2" class="w-5 h-5"></i>
-                    Muunna Moodle-muotoon
+                <button onclick="processContent()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm">
+                    <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+                    Jäsennä tehtävät
                 </button>
             </div>
         </div>
@@ -56,34 +55,21 @@
         <div class="w-1/2 flex flex-col bg-slate-50">
             <!-- Tabs -->
             <div class="flex border-b border-slate-200 bg-white shrink-0">
-                <button onclick="switchTab('cleaned')" id="tab-cleaned" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-blue-600 text-blue-600 hover:bg-slate-50 transition-colors">
-                    Siistitty raakateksti
-                </button>
-                <button onclick="switchTab('parsed')" id="tab-parsed" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors">
+                <button onclick="switchTab('parsed')" id="tab-parsed" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 hover:bg-slate-50 transition-colors">
                     Jäsennetyt kysymykset
                 </button>
-            </div>
-
-            <!-- Content: Cleaned Raw Text -->
-            <div id="view-cleaned" class="flex-1 overflow-y-auto p-4 space-y-4">
-                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="text-sm font-semibold text-slate-700">Koko teksti (Vim-makrot ajettu)</h3>
-                        <button onclick="copyToClipboard('cleanedOutput')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded border border-slate-300 transition-colors flex items-center gap-1">
-                            <i data-lucide="copy" class="w-3 h-3"></i> Kopioi
-                        </button>
-                    </div>
-                    <textarea id="cleanedOutput" readonly class="w-full h-[600px] text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded p-3 font-mono focus:outline-none focus:border-blue-400"></textarea>
-                </div>
+                <button onclick="switchTab('cleaned')" id="tab-cleaned" class="flex-1 py-3 px-4 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors">
+                    Raakateksti
+                </button>
             </div>
 
             <!-- Content: Parsed Questions -->
-            <div id="view-parsed" class="hidden flex-1 overflow-y-auto p-4 space-y-6">
+            <div id="view-parsed" class="flex-1 overflow-y-auto p-4 space-y-6">
                 <!-- Intro Context Card -->
                 <div id="contextCard" class="bg-white rounded-lg shadow-sm border-l-4 border-blue-500 p-4 hidden">
                     <div class="flex justify-between items-start mb-2">
-                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">Konteksti / Esitiedot</span>
-                        <button onclick="copyContent(this)" class="text-slate-400 hover:text-blue-600 transition-colors">
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">Johdanto / Konteksti</span>
+                        <button onclick="copyContent(this)" class="text-slate-400 hover:text-indigo-600 transition-colors" title="Kopioi">
                             <i data-lucide="copy" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -91,7 +77,20 @@
                 </div>
 
                 <!-- Questions Container -->
-                <div id="questionsList" class="space-y-4"></div>
+                <div id="questionsList" class="space-y-4 pb-10"></div>
+            </div>
+
+            <!-- Content: Cleaned Raw Text -->
+            <div id="view-cleaned" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-700">Siistitty teksti</h3>
+                        <button onclick="copyToClipboard('cleanedOutput')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded border border-slate-300 transition-colors flex items-center gap-1">
+                            <i data-lucide="copy" class="w-3 h-3"></i> Kopioi kaikki
+                        </button>
+                    </div>
+                    <textarea id="cleanedOutput" readonly class="w-full h-[600px] text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded p-3 font-mono focus:outline-none"></textarea>
+                </div>
             </div>
         </div>
     </main>
@@ -107,170 +106,176 @@
         lucide.createIcons();
 
         // --------------------------------------------------------
-        // CORE LOGIC: The Replacer (Equivalent to Vim Macros)
+        // 1. CLEANING LOGIC (Vim Macros & Formatting)
         // --------------------------------------------------------
         function applyReplacements(text) {
             let processed = text;
 
-            // 1. Remove Markdown Bold (*)
-            // Vim: %s/\*//g
+            // Remove Markdown bold/italic (*)
             processed = processed.replace(/\*/g, '');
-
-            // 2. Remove "Vaihe X:" lines
-            // Vim: g/^Vaihe [0-9]:/d
-            processed = processed.replace(/^Vaihe \d+:.*$/gm, '');
-
-            // 3. Remove Headers (###, ####)
-            // Vim: %s/####\s*//g
-            processed = processed.replace(/#{3,}\s*/g, '');
-
-            // 4. Remove Horizontal Rules (---)
-            // Vim: %s/---//g
+            // Remove headers (###)
+            processed = processed.replace(/#{2,}\s*/g, '');
+            // Remove horizontal rules (---)
             processed = processed.replace(/---/g, '');
-
-            // 5. Fix Math: \times -> \cdot
-            // Vim: :%s/\\times/\\cdot/g
+            // Fix Math: \times -> \cdot
             processed = processed.replace(/\\times/g, '\\cdot');
-
-            // 6. Fix Decimals: 1.5 -> 1,5 (Finnish Standard)
-            // Vim: %s/\(\d\)\.\(\d\)/\1,\2/g
-            // Note: This is aggressive and might affect version numbers like A1.3.1. 
-            // We apply it, but we might want to be careful with question IDs later.
+            // Fix Euro: € -> \text{€}
+            processed = processed.replace(/€/g, '\\text{€}');
+            
+            // Fix Decimals: 1.5 -> 1,5 (but avoid replacing in headers like A1.3.1)
+            // Strategy: replace dot with comma if surrounded by digits
             processed = processed.replace(/(\d)\.(\d)/g, '$1,$2');
 
-            // 7. Fix Euro sign: € -> \text{€}
-            processed = processed.replace(/€/g, '\\text{€}');
+            // Double $$ for Moodle
+            // Replace single $ with $$ if not already $$
+            processed = processed.replace(/(?<!\$)\$(?!\$)/g, '$$$$'); 
+            // Fix edge case where $$$$ might happen if logic fails
+            processed = processed.replace(/\$\$\$\$/g, '$$$$'); 
 
-            // 8. Add Double $$ for Moodle
-            // Strategy: Convert single $ to $$ IF it's not already $$.
-            // This is tricky. A simple approach is: replace all $ with $$, then fix $$$$ to $$.
-            // Or use a regex that looks for single $ boundary.
-            // Let's assume standard $x$ format.
-            // We use a negative lookahead/lookbehind to find single $.
-            processed = processed.replace(/(?<!\$)\$(?!\$)/g, '$$$$'); // Replace single $ with $$
-
-            // 9. Clean up Display Math brackets (Remove extra whitespace/newlines inside)
-            // Vim: %s/\\\[\s*\n*\s*/\\\[/g
-            processed = processed.replace(/\\\[\s*\n*\s*/g, '\\[');
-            // Vim: %s/\s*\n*\s*\\\]/\\\]/g
-            processed = processed.replace(/\s*\n*\s*\\\]/g, '\\]');
-
-            // 10. List Numbering Cleanup (1. Text -> Text)
-            // Vim: %s/[1-9]\. //g  (This is aggressive, removes "1. ")
-            // This might break the question list logic if we aren't careful, but requested.
-            // We will modify this slightly: Remove numbering only if it starts a line or is clearly a list item
-            processed = processed.replace(/^\s*\d+\.\s+/gm, ''); 
-
-            // 11. Normalize Newlines
-            // Vim: %s/\n\{2,}/\r/g (Reduce multiple newlines)
-            processed = processed.replace(/\n{3,}/g, '\n\n'); // Max 2 newlines
-            processed = processed.trim();
-
-            return processed;
+            // Normalize newlines
+            processed = processed.replace(/\n{3,}/g, '\n\n');
+            
+            return processed.trim();
         }
 
         // --------------------------------------------------------
-        // SMART PARSER: Break into Questions
+        // 2. PARSING LOGIC
         // --------------------------------------------------------
         function parseQuestions(text) {
             const lines = text.split('\n');
             let context = [];
             let questions = [];
             let currentQuestion = null;
+            let currentAnswerTarget = null; // Fix for "last question bug"
             
-            // Heuristic patterns
-            const questionIdRegex = /^(A\d+[.,]\d+[.,]\d+|Tehtävä \d+|Kysymys \d+)/i;
-            const optionRegex = /^[A-D]\./;
-            const modelAnswerRegex = /(Mallivastaukset|Vastaukset|Selitykset)/i;
+            // Regex patterns based on your instructions
+            // Supports: "Tehtävä 1", "Kysymys 1", "A1.1.1", "1."
+            const questionIdRegex = /^(Tehtävä\s+\d+|Kysymys\s+\d+|A\d+(?:[.,]\d+)*)([:.]?)/i;
+            const optionRegex = /^([A-D])\./; // Matches A., B., C., D.
+            const correctMarkerRegex = /\s*&&&&$/; // Matches &&&& at end of line
+            const modelAnswerHeaderRegex = /^(Mallivastaukset|Vastaukset|Selitykset)/i;
 
-            let parsingMode = 'context'; // context, questions, answers
+            let parsingMode = 'context'; // 'context', 'questions', 'answers'
 
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
+                let line = lines[i].trim();
                 if (!line) continue;
 
-                // Detect shift to Answers section
-                if (modelAnswerRegex.test(line)) {
+                // --- DETECT SECTION CHANGE ---
+                if (modelAnswerHeaderRegex.test(line)) {
                     parsingMode = 'answers';
-                    continue;
+                    // Reset current question so we don't append answer header to it
+                    currentQuestion = null; 
+                    continue; 
                 }
 
-                // Detect new Question (e.g., A1.3.1)
-                const qMatch = line.match(questionIdRegex);
-                
-                if (parsingMode === 'context' && qMatch) {
-                    parsingMode = 'questions';
-                }
-
+                // --- CONTEXT MODE ---
                 if (parsingMode === 'context') {
-                    context.push(line);
-                } else if (parsingMode === 'questions') {
+                    // Check if line starts a question
+                    const qMatch = line.match(questionIdRegex);
                     if (qMatch) {
-                        // Start new question
+                        parsingMode = 'questions';
+                        // Fall through to questions logic
+                    } else {
+                        context.push(line);
+                        continue;
+                    }
+                }
+
+                // --- QUESTIONS MODE ---
+                if (parsingMode === 'questions') {
+                    const qMatch = line.match(questionIdRegex);
+                    
+                    if (qMatch) {
+                        // Start New Question
                         if (currentQuestion) questions.push(currentQuestion);
+                        
+                        // ID is the matched part (e.g. "Tehtävä 1")
+                        // Text is the rest. remove colon if present.
+                        const id = qMatch[1];
+                        let content = line.substring(qMatch[0].length).trim();
+                        // Remove leading colon/dot from content if regex caught it in group 2
+                        if (content.startsWith(':') || content.startsWith('.')) content = content.substring(1).trim();
+
                         currentQuestion = {
-                            id: qMatch[0],
-                            text: line.replace(qMatch[0], '').trim(), // Remove ID from text for cleaner paste
-                            fullText: line,
+                            id: id,
+                            text: content, 
+                            fullText: line, // For "Copy All"
                             options: [],
-                            answer: '',
                             explanation: ''
                         };
                     } else if (optionRegex.test(line)) {
-                        // Is an option
+                        // It's an Option (A. B. C. D.)
                         if (currentQuestion) {
-                            currentQuestion.options.push(line);
+                            // Check for correct answer marker &&&&
+                            const isCorrect = correctMarkerRegex.test(line);
+                            // Remove the marker for display text
+                            const cleanOptionText = line.replace(correctMarkerRegex, '').trim();
+                            
+                            currentQuestion.options.push({
+                                raw: line, // Contains &&&&
+                                text: cleanOptionText, // No &&&&
+                                isCorrect: isCorrect
+                            });
                         }
                     } else {
-                        // Continuation of question text or unstructured text
+                        // Continuation of question text
                         if (currentQuestion) {
-                            // If it doesn't look like a new question, append to text
-                            if (!optionRegex.test(line)) {
-                                currentQuestion.text += '\n' + line;
-                                currentQuestion.fullText += '\n' + line;
-                            }
+                            currentQuestion.text += '\n' + line;
+                            currentQuestion.fullText += '\n' + line;
                         }
                     }
-                } else if (parsingMode === 'answers') {
-                    // Try to match answers to questions
-                    // This is hard to do perfectly without strict structure, 
-                    // so we will just dump remaining text or try to find ID matches
+                }
+
+                // --- ANSWERS MODE ---
+                else if (parsingMode === 'answers') {
+                    // Try to match an ID (e.g., "Tehtävä 1:")
                     const ansMatch = line.match(questionIdRegex);
+                    
                     if (ansMatch) {
-                        // Find the question this belongs to
-                        const qId = ansMatch[0]; // e.g., A1,3,1 (after comma replacement)
-                        // Need to be loose with matching because we replaced dots with commas in main text
-                        const targetQ = questions.find(q => q.id === qId || q.id.replace(/,/g, '.') === qId.replace(/,/g, '.'));
+                        const qIdRaw = ansMatch[1]; // e.g., "Tehtävä 1"
                         
-                        if (targetQ) {
-                            targetQ.explanation += line + '\n';
-                            // Look ahead for next lines until next ID
-                            // (Simplified logic for this demo)
+                        // Find the matching question object
+                        // We normalize to handle "Tehtävä 1" vs "Tehtävä 1." loose matching
+                        // Also handle A1.1 vs A1,1 conversion issues
+                        currentAnswerTarget = questions.find(q => {
+                            const normalizedQ = q.id.replace(/[,.]/g, '').toLowerCase();
+                            const normalizedA = qIdRaw.replace(/[,.]/g, '').toLowerCase();
+                            return normalizedQ === normalizedA;
+                        });
+
+                        // If found, append the rest of the line as explanation
+                        if (currentAnswerTarget) {
+                            let content = line.substring(ansMatch[0].length).trim();
+                            if (content.startsWith(':') || content.startsWith('.')) content = content.substring(1).trim();
+                            currentAnswerTarget.explanation = content;
                         }
                     } else {
-                        // Append to last modified question or ignore
-                        // For this demo, let's just leave it basic.
+                        // It's a continuation line for the PREVIOUS answer
+                        // This fixes the "last question" bug. We keep appending to the last found target.
+                        if (currentAnswerTarget) {
+                            currentAnswerTarget.explanation += '\n' + line;
+                        }
                     }
                 }
             }
-            if (currentQuestion) questions.push(currentQuestion);
+            // Push the last question if loop finishes
+            if (currentQuestion && parsingMode === 'questions') questions.push(currentQuestion);
 
             return { context: context.join('\n'), questions };
         }
 
         // --------------------------------------------------------
-        // UI FUNCTIONS
+        // 3. UI RENDERING
         // --------------------------------------------------------
 
         function processContent() {
             const rawInput = document.getElementById('inputArea').value;
             if (!rawInput) return;
 
-            // 1. Run Clean Logic
             const cleanedText = applyReplacements(rawInput);
             document.getElementById('cleanedOutput').value = cleanedText;
 
-            // 2. Run Smart Parse Logic
             const parsedData = parseQuestions(cleanedText);
             renderParsedView(parsedData);
         }
@@ -293,35 +298,80 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden';
                 
+                // --- OPTIONS RENDER ---
                 let optionsHtml = '';
-                q.options.forEach(opt => {
-                    optionsHtml += `<div class="text-slate-600 ml-4 py-1 border-l-2 border-slate-100 pl-2 text-sm font-mono">${escapeHtml(opt)}</div>`;
-                });
+                if (q.options.length > 0) {
+                    optionsHtml = '<div class="mt-4 space-y-2">';
+                    q.options.forEach(opt => {
+                        // Visual style for correct answer (green border if correct)
+                        const borderClass = opt.isCorrect 
+                            ? 'border-green-500 bg-green-50' 
+                            : 'border-slate-200 hover:border-slate-300';
+                        
+                        const badgeHtml = opt.isCorrect 
+                            ? '<span class="text-[10px] font-bold text-green-700 uppercase tracking-wider ml-2 bg-green-200 px-1 rounded">Oikein</span>' 
+                            : '';
 
+                        optionsHtml += `
+                            <div class="flex items-center gap-2 group">
+                                <div class="flex-1 p-2 rounded border ${borderClass} text-sm font-mono flex justify-between items-center transition-colors">
+                                    <span class="text-slate-700">${escapeHtml(opt.text)}</span>
+                                    ${badgeHtml}
+                                </div>
+                                <button onclick="copyText('${escapeJs(opt.text)}')" class="p-2 text-slate-400 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 rounded transition-colors" title="Kopioi vaihtoehto">
+                                    <i data-lucide="copy" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                    optionsHtml += '</div>';
+                }
+
+                // --- EXPLANATION RENDER ---
+                let explanationHtml = '';
+                if (q.explanation && q.explanation.trim() !== '') {
+                    explanationHtml = `
+                        <div class="mt-4 pt-3 border-t border-slate-100">
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="text-xs font-semibold text-slate-500 uppercase">Mallivastaus / Selitys</span>
+                                <button onclick="copyText('${escapeJs(q.explanation)}')" class="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium py-1 px-2 rounded hover:bg-indigo-50 transition-colors">
+                                    <i data-lucide="copy" class="w-3 h-3"></i> Kopioi selitys
+                                </button>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded border border-slate-200 text-sm font-mono text-slate-700 whitespace-pre-wrap">
+                                ${escapeHtml(q.explanation)}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // --- CARD STRUCTURE ---
                 card.innerHTML = `
-                    <div class="bg-slate-100 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
-                        <span class="font-bold text-slate-700 text-sm">${q.id}</span>
+                    <div class="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center">
+                        <span class="font-bold text-indigo-900 text-sm">${escapeHtml(q.id)}</span>
                         <div class="flex gap-2">
-                             <button onclick="copyText('${escapeJs(q.text)}')" class="text-xs bg-white hover:bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 transition-colors">
-                                Kopioi Kysymys
-                            </button>
-                             <button onclick="copyText('${escapeJs(q.fullText)}')" class="text-xs bg-white hover:bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-300 transition-colors">
-                                Kaikki
+                             <button onclick="copyText('${escapeJs(q.text)}')" class="text-xs bg-white hover:bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-200 shadow-sm transition-colors flex items-center gap-1">
+                                <i data-lucide="copy" class="w-3 h-3"></i> Kysymys
                             </button>
                         </div>
                     </div>
                     <div class="p-4">
-                        <div class="mb-3 text-slate-800 font-mono text-sm whitespace-pre-wrap">${escapeHtml(q.text)}</div>
-                        ${optionsHtml ? `<div class="mt-2 space-y-1 bg-slate-50 p-2 rounded">${optionsHtml}</div>` : ''}
-                        ${q.explanation ? `<div class="mt-3 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100"><strong>Selitys:</strong><br>${escapeHtml(q.explanation)}</div>` : ''}
+                        <div class="text-slate-800 font-mono text-sm whitespace-pre-wrap">${escapeHtml(q.text)}</div>
+                        ${optionsHtml}
+                        ${explanationHtml}
                     </div>
                 `;
                 questionsList.appendChild(card);
             });
             
+            // Re-run icons for new elements
             lucide.createIcons();
         }
 
+        // --------------------------------------------------------
+        // UTILS
+        // --------------------------------------------------------
+        
         function switchTab(tabName) {
             const btnCleaned = document.getElementById('tab-cleaned');
             const btnParsed = document.getElementById('tab-parsed');
@@ -329,17 +379,17 @@
             const viewParsed = document.getElementById('view-parsed');
 
             if (tabName === 'cleaned') {
-                btnCleaned.classList.add('border-blue-600', 'text-blue-600');
+                btnCleaned.classList.add('border-indigo-600', 'text-indigo-600');
                 btnCleaned.classList.remove('border-transparent', 'text-slate-500');
-                btnParsed.classList.remove('border-blue-600', 'text-blue-600');
+                btnParsed.classList.remove('border-indigo-600', 'text-indigo-600');
                 btnParsed.classList.add('border-transparent', 'text-slate-500');
                 
                 viewCleaned.classList.remove('hidden');
                 viewParsed.classList.add('hidden');
             } else {
-                btnParsed.classList.add('border-blue-600', 'text-blue-600');
+                btnParsed.classList.add('border-indigo-600', 'text-indigo-600');
                 btnParsed.classList.remove('border-transparent', 'text-slate-500');
-                btnCleaned.classList.remove('border-blue-600', 'text-blue-600');
+                btnCleaned.classList.remove('border-indigo-600', 'text-indigo-600');
                 btnCleaned.classList.add('border-transparent', 'text-slate-500');
 
                 viewParsed.classList.remove('hidden');
@@ -353,10 +403,6 @@
             document.getElementById('questionsList').innerHTML = '';
             document.getElementById('contextCard').classList.add('hidden');
         }
-
-        // --------------------------------------------------------
-        // UTILS
-        // --------------------------------------------------------
         
         function copyToClipboard(elementId) {
             const el = document.getElementById(elementId);
@@ -394,9 +440,13 @@
 
         function escapeJs(text) {
             if (!text) return '';
-            return text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+            return text
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '');
         }
-
     </script>
 </body>
 </html>
