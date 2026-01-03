@@ -221,7 +221,12 @@
                     } else {
                         // Continuation of question text
                         if (currentQuestion) {
-                            currentQuestion.text += '\n' + line;
+                            // FIX: Check if text is empty before appending newline to avoid initial blank line
+                            if (currentQuestion.text && currentQuestion.text.length > 0) {
+                                currentQuestion.text += '\n' + line;
+                            } else {
+                                currentQuestion.text = line;
+                            }
                             currentQuestion.fullText += '\n' + line;
                         }
                     }
@@ -302,28 +307,36 @@
                 let optionsHtml = '';
                 if (q.options.length > 0) {
                     optionsHtml = '<div class="mt-4 space-y-2">';
-                    q.options.forEach(opt => {
-                        // Visual style for correct answer (green border if correct)
-                        const borderClass = opt.isCorrect 
-                            ? 'border-green-500 bg-green-50' 
-                            : 'border-slate-200 hover:border-slate-300';
+                    
+                    const renderOptionRow = (text, isCorrect) => {
+                        const borderClass = isCorrect 
+                            ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+                            : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50';
                         
-                        const badgeHtml = opt.isCorrect 
+                        const badgeHtml = isCorrect 
                             ? '<span class="text-[10px] font-bold text-green-700 uppercase tracking-wider ml-2 bg-green-200 px-1 rounded">Oikein</span>' 
                             : '';
 
-                        optionsHtml += `
-                            <div class="flex items-center gap-2 group">
-                                <div class="flex-1 p-2 rounded border ${borderClass} text-sm font-mono flex justify-between items-center transition-colors">
-                                    <span class="text-slate-700">${escapeHtml(opt.text)}</span>
+                        return `
+                            <div onclick="copyText('${escapeJs(text)}')" 
+                                 class="cursor-pointer group relative p-3 rounded border ${borderClass} transition-all duration-200 shadow-sm select-none"
+                                 title="Klikkaa kopioidaksesi">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-mono text-slate-700 group-hover:text-slate-900">${escapeHtml(text)}</span>
                                     ${badgeHtml}
                                 </div>
-                                <button onclick="copyText('${escapeJs(opt.text)}')" class="p-2 text-slate-400 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 rounded transition-colors" title="Kopioi vaihtoehto">
-                                    <i data-lucide="copy" class="w-4 h-4"></i>
-                                </button>
+                                <div class="absolute inset-0 rounded ring-2 ring-indigo-500 opacity-0 group-active:opacity-100 transition-opacity pointer-events-none"></div>
                             </div>
                         `;
+                    };
+
+                    q.options.forEach(opt => {
+                        optionsHtml += renderOptionRow(opt.text, opt.isCorrect);
                     });
+
+                    // ADD 5TH OPTION AUTOMATICALLY
+                    optionsHtml += renderOptionRow("Jätän vastaamatta kysymykseen.", false);
+
                     optionsHtml += '</div>';
                 }
 
